@@ -466,6 +466,10 @@ class Pkg:
         self._missingok_files = None
         self._files = None
         self._requires = None
+        self._suggests = None
+        self._supplements = None
+        self._enhances = None
+        self._recommends = None
         self._req_names = -1
 
         if header:
@@ -716,6 +720,22 @@ class Pkg:
         self._gatherDepInfo()
         return self._requires
 
+    def recommends(self):
+        self._gatherDepInfo()
+        return self._recommends
+
+    def suggests(self):
+        self._gatherDepInfo()
+        return self._suggests
+
+    def supplements(self):
+        self._gatherDepInfo()
+        return self._supplements
+
+    def enhances(self):
+        self._gatherDepInfo()
+        return self._enhances
+
     def prereq(self):
         """Get package PreReqs as list of
            (name, flags, (epoch, version, release)) tuples."""
@@ -752,7 +772,7 @@ class Pkg:
 
     # internal function to gather dependency info used by the above ones
     def _gather_aux(self, header, list, nametag, flagstag, versiontag,
-                    prereq=None):
+                    prereq = None, strong_only = False, weak_only = False):
         names = header[nametag]
         flags = header[flagstag]
         versions = header[versiontag]
@@ -763,7 +783,11 @@ class Pkg:
                 evr = stringToVersion(b2s(versions[loop]))
                 if prereq is not None and flags[loop] & PREREQ_FLAG:
                     prereq.append((name, flags[loop] & (~PREREQ_FLAG), evr))
-                else:
+                elif strong_only and flags[loop] & rpm.RPMSENSE_STRONG:
+                    list.append((names[loop], versions[loop], flags[loop] & (~rpm.RPMSENSE_STRONG)))
+                elif  weak_only and not (flags[loop] & rpm.RPMSENSE_STRONG):
+                    list.append((names[loop], versions[loop], flags[loop]))
+                elif not (weak_only or strong_only):
                     list.append((name, flags[loop], evr))
 
     def _gatherDepInfo(self):
@@ -773,6 +797,10 @@ class Pkg:
             self._provides = []
             self._conflicts = []
             self._obsoletes = []
+            self._suggests = []
+            self._supplements = []
+            self._enhances = []
+            self._recommends = []
 
             self._gather_aux(self.header, self._requires,
                              rpm.RPMTAG_REQUIRENAME,
@@ -791,6 +819,26 @@ class Pkg:
                              rpm.RPMTAG_OBSOLETENAME,
                              rpm.RPMTAG_OBSOLETEFLAGS,
                              rpm.RPMTAG_OBSOLETEVERSION)
+            try:
+                self._gather_aux(self.header, self._recommends,
+                                 rpm.RPMTAG_RECOMMENDNAME,
+                                 rpm.RPMTAG_RECOMMENDFLAGS,
+                                 rpm.RPMTAG_RECOMMENDVERSION)
+                self._gather_aux(self.header, self._suggests,
+                                 rpm.RPMTAG_SUGGESTNAME,
+                                 rpm.RPMTAG_SUGGESTFLAGS,
+                                 rpm.RPMTAG_SUGGESTVERSION)
+                self._gather_aux(self.header, self._supplements,
+                                 rpm.RPMTAG_SUPPLEMENTNAME,
+                                 rpm.RPMTAG_SUPPLEMENTFLAGS,
+                                 rpm.RPMTAG_SUPPLEMENTVERSION)
+                self._gather_aux(self.header, self._enhances,
+                                 rpm.RPMTAG_ENHANCENAME,
+                                 rpm.RPMTAG_ENHANCEFLAGS,
+                                 rpm.RPMTAG_ENHANCEVERSION)
+            except:
+                pass
+
 
     def scriptprog(self, which):
         """Get the specified script interpreter as a string.
@@ -803,6 +851,7 @@ class Pkg:
             # http://rpm.org/ticket/847#comment:2
             prog = b' '.join(prog)
         return b2s(prog)
+
 
 
 def getInstalledPkgs(name):
