@@ -1429,7 +1429,7 @@ class FilesCheck(AbstractCheck.AbstractCheck):
         for exe, paths in bindir_exes.items():
             if len(paths) > 1:
                 printWarning(pkg, "duplicate-executable", exe, paths)
-            if exe not in man_basenames:
+            if exe not in man_basenames and not exe.startswith("rc") and len(paths) is not 0:
                 printWarning(pkg, "no-manual-page-for-binary", exe)
 
 # Create an object to enable the auto registration of the test
