@@ -448,6 +448,10 @@ class SpecCheck(AbstractCheck.AbstractCheck):
                                          'comparison-operator-in-deptoken',
                                          conf)
 
+            if current_section in ('post', 'postun'):
+                if line.find('%run_ldconfig') != -1:
+                    printWarning(pkg, 'deprecated-use-of-%run_ldconfig')
+
             if current_section == 'changelog':
                 for match in AbstractCheck.macro_regex.findall(line):
                     res = re.match('%+', match)
@@ -772,6 +776,14 @@ may break short circuit builds.''',
 'make-check-outside-check-section',
 '''Make check or other automated regression test should be run in %check, as
 they can be disabled with a rpm macro for short circuiting purposes.''',
+
+'deprecated-use-of-%run_ldconfig',
+'''According to the new SUSE Packaging Conventions, the use of %run_ldconfig
+is deprecated. Please use /sbin/ldconfig instead, or
+
+%post(un) -p /sbin/ldconfig
+
+in the case where ldconfig is the only command to be executed.''',
 
 'macro-in-%changelog',
 '''Macros are expanded in %changelog too, which can in unfortunate cases lead
