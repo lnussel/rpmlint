@@ -422,6 +422,7 @@ invalid_version_regex = re.compile('([0-9](?:rc|alpha|beta|pre).*)', re.IGNORECA
 # () are here for grouping purpose in the regexp
 forbidden_words_regex = re.compile('(' + Config.getOption('ForbiddenWords') + ')', re.IGNORECASE)
 valid_buildhost_regex = re.compile(Config.getOption('ValidBuildHost'))
+valid_filedep_regex=re.compile('(?:/s?bin/|^/etc/|^/usr/lib/sendmail$)')
 use_epoch = Config.getOption('UseEpoch', False)
 use_utf8 = Config.getOption('UseUTF8', Config.USEUTF8_DEFAULT)
 max_line_len = Config.getOption('MaxLineLength', 79)
@@ -601,6 +602,9 @@ class TagsCheck(AbstractCheck.AbstractCheck):
 
             if d[0].startswith('/usr/local/'):
                 printError(pkg, 'invalid-dependency', d[0])
+
+            if d[0].startswith('/') and not valid_filedep_regex.search(d[0]):
+                printWarning(pkg, 'invalid-filepath-dependency', d[0])
 
             if is_source:
                 if lib_devel_number_regex.search(d[0]):
@@ -1126,6 +1130,12 @@ unneeded explicit Requires: tags.''',
 'useless-provides',
 '''This package provides 2 times the same capacity. It should only provide it
 once.''',
+
+'invalid-filepath-dependency',
+'''A package has a file or path based dependency that is not resolveable for
+package solvers because it is not in the whitelist for path based dependencies
+and therefore not available in repository metadata. Please use a symbolic requires
+instead or require a file in bin or /etc.''',
 
 'tag-not-utf8',
 '''The character encoding of the value of this tag is not UTF-8.''',
