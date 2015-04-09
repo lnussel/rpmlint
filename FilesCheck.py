@@ -1245,7 +1245,7 @@ class FilesCheck(AbstractCheck.AbstractCheck):
                     # ...but executed ones should
                     elif interpreter or mode_is_exec or script_regex.search(f):
                         if interpreter:
-                            if not interpreter_regex.search(interpreter):
+                            if mode & 0111 != 0 and not interpreter_regex.search(interpreter):
                                 printError(pkg, 'wrong-script-interpreter',
                                            f, interpreter)
                         elif not nonexec_file and not \
