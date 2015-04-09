@@ -562,9 +562,8 @@ class SpecCheck(AbstractCheck.AbstractCheck):
                     printWarning(pkg, "patch-not-applied",
                                  "Patch%d:" % pnum, pfile)
 
-        # Rest of the checks require a real spec file
-        if not self._spec_file:
-            return
+        # Skip rest of the checks
+        return
 
         # We'd like to parse the specfile only once using python bindings,
         # but it seems errors from rpmlib get logged to stderr and we can't
