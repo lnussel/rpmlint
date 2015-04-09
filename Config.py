@@ -10,6 +10,7 @@
 import locale
 import os.path
 import re
+import sys
 
 try:
     from __version__ import __version__
@@ -175,7 +176,17 @@ def isFiltered(s):
             if '(' in _filters_non_except[idx]:
                 _non_named_group_re.subn('(:?', _filters_non_except[idx])
             _filters_non_except_re = _filters_non_except_re + '|(?:' + _filters_non_except[idx] +')'
-        _filters_non_except_re = re.compile(_filters_non_except_re)
+        try:
+            _filters_non_except_re = re.compile(_filters_non_except_re)
+        except Exception:
+            # Try to figure out which filter caused the error
+            for f in _filters_non_except[1:]:
+                try:
+                    re.compile(f)
+                except Exception as e:
+                    # can't use Pkg.error/warn here, as that would recurse
+                    print >> sys.stderr, "(none): E: %s in filter '%s'" % (e.message, f)
+                    sys.exit(2)
 
     if _filters_re == None and len(_filters):
         _filters_re = '(?:' + _filters[0] + ')'
@@ -187,7 +198,17 @@ def isFiltered(s):
             if '(' in _filters[idx]:
                 _non_named_group_re.subn('(:?', _filters[idx])
             _filters_re = _filters_re + '|(?:' + _filters[idx] + ')'
-        _filters_re = re.compile(_filters_re)
+        try:
+            _filters_re = re.compile(_filters_re)
+        except Exception:
+            # Try to figure out which filter caused the error
+            for f in _filters[1:]:
+                try:
+                    re.compile(f)
+                except Exception as e:
+                    # can't use Pkg.error/warn here, as that would recurse
+                    print >> sys.stderr, "(none): E: %s in filter '%s'" % (e.message, f)
+                    sys.exit(2)
 
     if _filters_except_re == None and len(_filters_except):
         _filters_except_re = '(?:' + _filters_except[0] + ')'
