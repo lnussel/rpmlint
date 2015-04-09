@@ -599,7 +599,7 @@ DEFAULT_DISALLOWED_DIRS = (
 )
 
 sub_bin_regex = re.compile('^(/usr)?/s?bin/\S+/')
-backup_regex = re.compile('(~|\#[^/]+\#|\.orig|\.rej)$')
+backup_regex = re.compile('(~|\#[^/]+\#|\.orig|\.orig\.gz|\.rej)$')
 compr_regex = re.compile('\.(gz|z|Z|zip|bz2|lzma|xz)$')
 absolute_regex = re.compile('^/([^/]+)')
 absolute2_regex = re.compile('^/?([^/]+)')
