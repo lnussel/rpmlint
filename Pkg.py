@@ -475,6 +475,10 @@ class Pkg(AbstractPkg):
         self._missingok_files = None
         self._files = None
         self._requires = None
+        self._suggests = None
+        self._supplements = None
+        self._enhances = None
+        self._recommends = None
         self._req_names = -1
 
         if header:
@@ -730,6 +734,22 @@ class Pkg(AbstractPkg):
         self._gatherDepInfo()
         return self._requires
 
+    def recommends(self):
+        self._gatherDepInfo()
+        return self._recommends
+
+    def suggests(self):
+        self._gatherDepInfo()
+        return self._suggests
+
+    def supplements(self):
+        self._gatherDepInfo()
+        return self._supplements
+
+    def enhances(self):
+        self._gatherDepInfo()
+        return self._enhances
+
     def prereq(self):
         """Get package PreReqs as list of
            (name, flags, (epoch, version, release)) tuples."""
@@ -790,7 +810,7 @@ class Pkg(AbstractPkg):
 
     # internal function to gather dependency info used by the above ones
     def _gather_aux(self, header, list, nametag, flagstag, versiontag,
-                    prereq=None):
+                    prereq = None, strong_only = False, weak_only = False):
         names = header[nametag]
         flags = header[flagstag]
         versions = header[versiontag]
@@ -801,7 +821,11 @@ class Pkg(AbstractPkg):
                 evr = stringToVersion(b2s(versions[loop]))
                 if prereq is not None and flags[loop] & PREREQ_FLAG:
                     prereq.append((name, flags[loop] & (~PREREQ_FLAG), evr))
-                else:
+                elif strong_only and flags[loop] & rpm.RPMSENSE_STRONG:
+                    list.append((names[loop], versions[loop], flags[loop] & (~rpm.RPMSENSE_STRONG)))
+                elif  weak_only and not (flags[loop] & rpm.RPMSENSE_STRONG):
+                    list.append((names[loop], versions[loop], flags[loop]))
+                elif not (weak_only or strong_only):
                     list.append((name, flags[loop], evr))
 
     def _gatherDepInfo(self):
@@ -865,6 +889,7 @@ class Pkg(AbstractPkg):
             # http://rpm.org/ticket/847#comment:2
             prog = "".join(prog)
         return prog
+
 
 
 def getInstalledPkgs(name):

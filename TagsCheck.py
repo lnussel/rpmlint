@@ -854,8 +854,27 @@ class TagsCheck(AbstractCheck.AbstractCheck):
             value = Pkg.formatRequire(*c)
             self._unexpanded_macros(pkg, 'Conflicts %s' % (value,), value)
 
+        for i in pkg.supplements():
+            value = Pkg.formatRequire(*i)
+            self._unexpanded_macros(pkg, 'Supplements %s' % (value,), value)
+
+        for i in pkg.suggests():
+            value = Pkg.formatRequire(*i)
+            self._unexpanded_macros(pkg, 'Suggests %s' % (value,), value)
+
+        for i in pkg.enhances():
+            value = Pkg.formatRequire(*i)
+            self._unexpanded_macros(pkg, 'Enhances %s' % (value,), value)
+
+        for i in pkg.recommends():
+            value = Pkg.formatRequire(*i)
+            self._unexpanded_macros(pkg, 'Recommends %s' % (value,), value)
+
         obss = pkg.obsoletes()
         if obss:
+            for obs in obss:
+                value = Pkg.formatRequire(*obs)
+                self._unexpanded_macros(pkg, 'Obsoletes %s' % (value,), value)
             provs = pkg.provides()
             for prov in provs:
                 for obs in obss:
