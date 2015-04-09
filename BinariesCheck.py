@@ -14,7 +14,7 @@ import sys
 
 import rpm
 
-from Filter import addDetails, printError, printWarning
+from Filter import addDetails, printError, printWarning, printInfo
 import AbstractCheck
 import Config
 import Pkg
@@ -46,6 +46,9 @@ class BinaryInfo:
     unused_regex = re.compile('^\s+(\S+)')
     exit_call_regex = create_regexp_call('_?exit')
     fork_call_regex = create_regexp_call('fork')
+    debuginfo_regex=re.compile('^\s+\[\s*\d+\]\s+\.debug_.*\s+')
+    symtab_regex=re.compile('^\s+\[\s*\d+\]\s+\.symtab\s+')
+    gethostbyname_call_regex = re.compile('\s+FUNC\s+.*?\s+(gethostbyname(?:@\S+)?)(?:\s|$)')
     # regexp for setgid setegid setresgid set(?:res|e)?gid
     setgid_call_regex = create_regexp_call(['setresgid', 'setegid', 'setgid'])
     setuid_call_regex = create_regexp_call(['setresuid', 'seteuid', 'setuid'])
@@ -66,7 +69,10 @@ class BinaryInfo:
         self.stack = False
         self.exec_stack = False
         self.exit_calls = []
+        self.calls_gethostbyname = False
         fork_called = False
+        self.debuginfo = 0
+        self.symtab=0
         self.tail = ''
 
         self.setgid = False
@@ -135,6 +141,11 @@ class BinaryInfo:
                         self.exec_stack = True
                     continue
 
+                r = BinaryInfo.gethostbyname_call_regex.search(l)
+                if r:
+                    self.calls_gethostbyname = True
+                    continue
+
                 if is_shlib:
                     r = BinaryInfo.exit_call_regex.search(l)
                     if r:
@@ -144,6 +155,14 @@ class BinaryInfo:
                     if r:
                         fork_called = True
                         continue
+
+                if BinaryInfo.debuginfo_regex.search(l):
+                    self.debuginfo=1
+                    continue
+
+                if BinaryInfo.symtab_regex.search(l):
+                    self.symtab=1
+                    continue
 
             if self.non_pic:
                 self.non_pic = 'TEXTREL' in res[1]
@@ -339,12 +358,25 @@ class BinariesCheck(AbstractCheck.AbstractCheck):
                 continue
 
             # stripped ?
-            if 'not stripped' in pkgfile.magic:
+            if 'not stripped' in pkgfile.magic and \
+               (os.environ.get('BUILD_DIR', '') == '' or
+               os.environ.get('BUILD_DEBUG', '') != ''):
                 printWarning(pkg, 'unstripped-binary-or-object', fname)
 
             # inspect binary file
             is_shlib = so_regex.search(fname)
             bin_info = BinaryInfo(pkg, pkgfile.path, fname, is_ar, is_shlib)
+
+            # stripped static library
+            if is_ar:
+                if bin_info.readelf_error:
+                    pass
+                elif not bin_info.symtab:
+                    printError(pkg, 'static-library-without-symtab', fname)
+                elif not bin_info.debuginfo and \
+                    (os.environ.get('BUILD_DIR', '') == '' or \
+                    os.environ.get('BUILD_DEBUG','') != ''):
+                    printWarning(pkg, 'static-library-without-debuginfo', fname)
 
             if is_shlib:
                 has_lib = True
@@ -395,6 +427,10 @@ class BinariesCheck(AbstractCheck.AbstractCheck):
                 # calls exit() or _exit()?
                 for ec in bin_info.exit_calls:
                     printWarning(pkg, 'shared-lib-calls-exit', fname, ec)
+
+            # gethostbyname ?
+            if bin_info.calls_gethostbyname:
+                printInfo(pkg, 'binary-or-shlib-calls-gethostbyname', fname)
 
             # rpath ?
             if bin_info.rpath:
@@ -603,6 +639,14 @@ with the intended shared libraries only.''',
 'ldd-failed',
 '''Executing ldd on this file failed, all checks could not be run.''',
 
+'static-library-without-symtab',
+'''The static library doesn't contain any symbols and therefore can't be linked
+against. This may indicated that it was strip.''',
+
+'static-library-without-debuginfo',
+'''The static library doesn't contain any debuginfo. Binaries linking against
+this static library can't be properly debugged.''',
+
 'executable-stack',
 '''The binary declares the stack as executable.  Executable stack is usually an
 error as it is only needed if the code contains GCC trampolines or similar
@@ -614,6 +658,10 @@ don\'t define a proper .note.GNU-stack section.''',
 '''The binary lacks a PT_GNU_STACK section.  This forces the dynamic linker to
 make the stack executable.  Usual suspects include use of a non-GNU linker or
 an old GNU linker version.''',
+
+'binary-or-shlib-calls-gethostbyname',
+'''The binary calls gethostbyname(). Please port the code to use
+getaddrinfo().''',
 
 'shared-lib-calls-exit',
 '''This library package calls exit() or _exit(), probably in a non-fork()
@@ -632,6 +680,12 @@ form, make sure that rpmbuild does not strip it during the build, and on setups
 that use prelink, make sure that prelink does not strip it either, usually by
 placing a blacklist file in /etc/prelink.conf.d.  For more information, see
 http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=256900#49''',
+
+'unstripped-binary-or-object',
+'''stripping debug info from binaries happens automatically according to global
+project settings. So there's normally no need to manually strip binaries.
+Left over unstripped binaries could therefore indicate a bug in the automatic
+stripping process.''',
 
 'non-position-independent-executable',
 '''This executable must be position independent.  Check that it is built with
