@@ -716,6 +716,9 @@ class TagsCheck(AbstractCheck.AbstractCheck):
             else:
                 for lang in langs:
                     self.check_description(pkg, lang, ignored_words)
+
+            if len(pkg[rpm.RPMTAG_DESCRIPTION].partition('Authors:')[0])-4 < len(pkg[rpm.RPMTAG_SUMMARY]):
+                printWarning(pkg, 'description-shorter-than-summary')
         else:
             printError(pkg, 'no-description-tag')
 
@@ -996,6 +999,10 @@ Name tag.''',
 'no-major-in-name',
 '''The major number of the library isn't included in the package's name.
 ''',
+
+'description-shorter-than-summary',
+'''The package description should be longer than the summary. be a bit more
+verbose, please.''',
 
 'no-provides',
 '''Your library package doesn't provide the -devel name without the major
