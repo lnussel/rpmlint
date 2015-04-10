@@ -36,6 +36,10 @@ LSB_KEYWORDS = ('Provides', 'Required-Start', 'Required-Stop', 'Should-Start',
 RECOMMENDED_LSB_KEYWORDS = ('Provides', 'Required-Start', 'Required-Stop',
                             'Default-Stop', 'Short-Description')
 
+suse = True
+stop_on_removal_regex=re.compile('bin/systemctl stop \$service >/dev/null')
+restart_on_update_regex=re.compile('bin/systemctl try-restart \$service >/dev/null')
+insserv_cleanup_regex=re.compile('^\s*/sbin/insserv /etc/init.d$', re.MULTILINE)
 
 class InitScriptCheck(AbstractCheck.AbstractCheck):
 
@@ -44,6 +48,12 @@ class InitScriptCheck(AbstractCheck.AbstractCheck):
 
     def check_binary(self, pkg):
         initscript_list = []
+
+        # check chkconfig call in %post and %preun
+        postin = Pkg.b2s(pkg[rpm.RPMTAG_POSTIN]) or pkg.scriptprog(rpm.RPMTAG_POSTINPROG)
+        preun = Pkg.b2s(pkg[rpm.RPMTAG_PREUN]) or pkg.scriptprog(rpm.RPMTAG_PREUNPROG)
+        postun = Pkg.b2s(pkg[rpm.RPMTAG_POSTUN]) or pkg.scriptprog(rpm.RPMTAG_POSTUNPROG)
+
         for fname, pkgfile in pkg.files().items():
 
             if not fname.startswith('/etc/init.d/') and \
@@ -61,20 +71,30 @@ class InitScriptCheck(AbstractCheck.AbstractCheck):
             if "." in basename:
                 printError(pkg, 'init-script-name-with-dot', fname)
 
-            # check chkconfig call in %post and %preun
-            postin = pkg[rpm.RPMTAG_POSTIN] or \
-                     pkg.scriptprog(rpm.RPMTAG_POSTINPROG)
-            if not postin:
-                printError(pkg, 'init-script-without-chkconfig-postin', fname)
-            elif not chkconfig_regex.search(postin):
-                printError(pkg, 'postin-without-chkconfig', fname)
+            if not suse:
+                # check chkconfig call in %post and %preun
+                postin = pkg[rpm.RPMTAG_POSTIN] or \
+                         pkg.scriptprog(rpm.RPMTAG_POSTINPROG)
+                if not postin:
+                    printError(pkg, 'init-script-without-chkconfig-postin', fname)
+                elif not chkconfig_regex.search(postin):
+                    printError(pkg, 'postin-without-chkconfig', fname)
 
-            preun = pkg[rpm.RPMTAG_PREUN] or \
-                    pkg.scriptprog(rpm.RPMTAG_PREUNPROG)
-            if not preun:
-                printError(pkg, 'init-script-without-chkconfig-preun', fname)
-            elif not chkconfig_regex.search(preun):
-                printError(pkg, 'preun-without-chkconfig', fname)
+                preun = pkg[rpm.RPMTAG_PREUN] or \
+                        pkg.scriptprog(rpm.RPMTAG_PREUNPROG)
+                if not preun:
+                    printError(pkg, 'init-script-without-chkconfig-preun', fname)
+                elif not chkconfig_regex.search(preun):
+                    printError(pkg, 'preun-without-chkconfig', fname)
+            else:
+                if not preun or not stop_on_removal_regex.search(preun):
+                    printError(pkg, 'init-script-without-%stop_on_removal-preun', fname)
+
+                if not postun or not restart_on_update_regex.search(postun):
+                    printError(pkg, 'init-script-without-%restart_on_update-postun', fname)
+
+                if not postun or not insserv_cleanup_regex.search(postun):
+                    printError(pkg, 'init-script-without-%insserv_cleanup-postun', fname)
 
             status_found = False
             reload_found = False
