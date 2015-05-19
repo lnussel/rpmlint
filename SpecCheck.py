@@ -64,7 +64,6 @@ biarch_package_regex = re.compile(DEFAULT_BIARCH_PACKAGES)
 hardcoded_lib_path_exceptions_regex = re.compile(Config.getOption('HardcodedLibPathExceptions', DEFAULT_HARDCODED_LIB_PATH_EXCEPTIONS))
 use_utf8 = Config.getOption('UseUTF8', Config.USEUTF8_DEFAULT)
 libdir_regex = re.compile('%{?_lib(?:dir)?\}?\\b')
-comment_or_empty_regex = re.compile('^\s*(#|$)')
 defattr_regex = re.compile('^\s*%defattr\\b')
 attr_regex = re.compile('^\s*%attr\\b')
 suse_version_regex = re.compile('%suse_version\s*[<>=]+\s*(\d+)')
@@ -179,7 +178,6 @@ class SpecCheck(AbstractCheck.AbstractCheck):
         patch_fuzz_override = False
         indent_spaces = 0
         indent_tabs = 0
-        files_has_defattr = False
         section = {}
         # None == main package
         current_package = None
@@ -230,9 +228,6 @@ class SpecCheck(AbstractCheck.AbstractCheck):
                     break
 
             if section_marker:
-
-                if current_section == 'files':
-                    files_has_defattr = False
 
                 if not is_lib_pkg and lib_package_regex.search(line):
                     is_lib_pkg = True
@@ -470,14 +465,6 @@ class SpecCheck(AbstractCheck.AbstractCheck):
                         patch_fuzz_override_regex.search(line) is not None
 
             if current_section == 'files':
-
-                if not comment_or_empty_regex.search(line) and not \
-                   (ifarch_regex.search(line) or if_regex.search(line) or
-                    endif_regex.search(line)):
-                    if defattr_regex.search(line):
-                        files_has_defattr = True
-                    elif not (files_has_defattr or attr_regex.search(line)):
-                        printWarning(pkg, 'files-attr-not-set')
 
                 # TODO: check scriptlets for these too?
                 if package_noarch.get(current_package) or \
