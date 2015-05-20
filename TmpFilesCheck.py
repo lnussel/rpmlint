@@ -14,6 +14,7 @@ from Filter import addDetails, printError, printWarning
 import AbstractCheck
 import Pkg
 import stat
+import rpm
 
 class TmpFilesCheck(AbstractCheck.AbstractCheck):
     '''Check systemd created tmpfiles are included in filelist'''
@@ -26,6 +27,11 @@ class TmpFilesCheck(AbstractCheck.AbstractCheck):
         if pkg.isSource():
             return
 
+        # file names handled by systemd-tmpfiles
+        tmp_files = set()
+        postin = pkg[rpm.RPMTAG_POSTIN]
+        prein = pkg[rpm.RPMTAG_PREIN]
+
         # see tmpfiles.d(5)
         interesting_types = ('f', 'F', 'w', 'd', 'D', 'p', 'L', 'c', 'b')
 
@@ -35,6 +41,13 @@ class TmpFilesCheck(AbstractCheck.AbstractCheck):
             if not stat.S_ISREG(pkgfile.mode):
                 printWarning(pkg, "tmpfile-not-regular-file", fn)
                 continue
+
+            pattern = re.compile(r'systemd-tmpfiles --create .*%s'%re.escape(fn))
+            if (not postin or not pattern.match(postin)) and \
+                    (not prein or not pattern.match(prein)):
+                printWarning(pkg,
+                             'postin-without-tmpfile-creation', fn)
+
             for line in open(pkgfile.path):
                 # skip comments
                 line = line.split('#')[0].split('\n')[0]
@@ -54,15 +67,37 @@ class TmpFilesCheck(AbstractCheck.AbstractCheck):
                 if not t in interesting_types:
                     continue
 
+                tmp_files.add(p)
+
                 if not p in pkg.files():
                     printWarning(pkg, "tmpfile-not-in-filelist", p)
                     continue
                 if not pkg.files()[p].is_ghost:
                     printWarning(pkg, "tmpfile-not-ghost", p)
 
+        # now check remaining ghost files that are not already
+        # handled by systemd-tmpfiles
+        ghost_files = set(pkg.ghostFiles()) - tmp_files
+        if ghost_files:
+            for f in ghost_files:
+                if f in pkg.missingOkFiles():
+                    continue
+                if not postin and not prein:
+                    printWarning(pkg, 'ghost-files-without-postin')
+                if (not postin or f not in postin) and \
+                        (not prein or f not in prein):
+                    printWarning(pkg,
+                                 'postin-without-ghost-file-creation', f)
+
+
+
 check = TmpFilesCheck()
 
 addDetails(
+'postin-without-ghost-file-creation',
+'''A file tagged as ghost is not created during %prein nor during %postin.''',
+'postin-without-tmpfile-creation',
+'''Please use the %tmpfiles_create macro in %post for each of your tmpfiles.d files''',
 'tmpfile-not-regular-file',
 '''files in tmpfiles.d need to be regular files''', # otherwise we won't open it :-)
 'tmpfile-not-in-filelist',
