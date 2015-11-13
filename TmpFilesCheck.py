@@ -43,8 +43,8 @@ class TmpFilesCheck(AbstractCheck.AbstractCheck):
                 continue
 
             pattern = re.compile(r'systemd-tmpfiles --create .*%s'%re.escape(fn))
-            if (not postin or not pattern.match(postin)) and \
-                    (not prein or not pattern.match(prein)):
+            if (not postin or not pattern.search(postin)) and \
+                    (not prein or not pattern.search(prein)):
                 printWarning(pkg,
                              'postin-without-tmpfile-creation', fn)
 
